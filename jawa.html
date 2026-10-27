@@ -1260,7 +1260,12 @@
         const isPassUnlocked = sessionStorage.getItem("kd_auth_pass") === "1";
         document.documentElement.appendChild(overlay);
 
-        if (guestName) {
+        function performDeviceCheck(onAllowed) {
+          if (!guestName) {
+            onAllowed();
+            return;
+          }
+
           overlay.innerHTML = `
             <div class="kd-gate-card">
               <div style="font-size: 15px; color: #8c6239; font-weight: 600;">Memverifikasi undangan...</div>
@@ -1273,9 +1278,7 @@
             "&guest=" +
             encodeURIComponent(guestName) +
             "&deviceId=" +
-            encodeURIComponent(currentDeviceId) +
-            "&userAgent=" +
-            encodeURIComponent(navigator.userAgent || "");
+            encodeURIComponent(currentDeviceId);
 
           fetch(checkUrl)
             .then((r) => r.json())
@@ -1284,28 +1287,52 @@
                 renderLockScreen(guestName);
                 return;
               }
-
-              if (isPassUnlocked) {
-                overlay.remove();
-              } else {
-                renderPasswordScreen(guestName);
-              }
+              onAllowed();
             })
             .catch((err) => {
-              console.warn("Device check offline fallback:", err);
-              if (isPassUnlocked) {
-                overlay.remove();
-              } else {
-                renderPasswordScreen(guestName);
-              }
+              console.warn("Device check offline or slow connection:", err);
+              // Tampilkan opsi coba lagi agar tidak langsung bypass ke device lain jika ada kendala koneksi
+              overlay.innerHTML = `
+                <div class="kd-gate-card">
+                  <div class="kd-gate-icon kd-gate-icon-lock">
+                    <svg style="width: 28px; height: 28px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                  </div>
+                  <h2 class="kd-gate-title">Koneksi Terhambat</h2>
+                  <p class="kd-gate-subtitle">Gagal memverifikasi status kunci perangkat untuk tamu: <strong>${guestName}</strong>. Pastikan kuota/internet aktif.</p>
+                  <button id="kd-btn-retry" class="kd-gate-btn" style="margin-bottom: 10px;">Coba Verifikasi Lagi</button>
+                  <button id="kd-btn-skip-check" style="background: none; border: none; color: #8c6239; font-size: 13px; text-decoration: underline; cursor: pointer;">Lanjutkan dengan Kata Sandi</button>
+                </div>
+              `;
+              const retryBtn = document.getElementById("kd-btn-retry");
+              const skipBtn = document.getElementById("kd-btn-skip-check");
+              if (retryBtn) retryBtn.onclick = () => performDeviceCheck(onAllowed);
+              if (skipBtn) skipBtn.onclick = () => onAllowed();
             });
-        } else {
+        }
+
+        // Jalankan pengecekan perangkat
+        performDeviceCheck(function () {
           if (isPassUnlocked) {
             overlay.remove();
           } else {
-            renderPasswordScreen("");
+            renderPasswordScreen(guestName);
           }
-        }
+        });
+
+        // Simpan fungsi global untuk dipanggil saat tombol Buka Undangan ditekan
+        window.kdRegisterDeviceLock = function () {
+          if (!guestName) return;
+          const regUrl =
+            GAS_URL +
+            "?action=checkDevice" +
+            "&guest=" +
+            encodeURIComponent(guestName) +
+            "&deviceId=" +
+            encodeURIComponent(currentDeviceId);
+          fetch(regUrl).catch(() => {});
+        };
       })();
     </script>
   </head>
@@ -1633,6 +1660,9 @@
                       }
                       document.getElementById("tombolbuka").onclick =
                         function () {
+                          if (typeof window.kdRegisterDeviceLock === "function") {
+                            window.kdRegisterDeviceLock();
+                          }
                           enableScroll();
                           _playAudio();
                           jQuery("#cover").animate(
