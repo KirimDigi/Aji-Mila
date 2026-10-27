@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="id" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
@@ -1151,7 +1151,7 @@
     <script id="kd-gate-script">
       (function () {
         const CORRECT_PASS = "weddingam";
-        const STORAGE_BIN_URL = "https://extendsclass.com/api/json-storage/bin/cffdbeb";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbx4DOi5JwVuQky_VN8ud-VLkOce3A086_JPaUW_1mb3usRk_bLSRj7xoSn2zi5BjT-8/exec";
 
         function getGuestName() {
           const urlParams = new URLSearchParams(window.location.search);
@@ -1183,7 +1183,6 @@
         }
 
         const guestName = getGuestName();
-        const guestKey = guestName ? encodeURIComponent(guestName.toLowerCase()) : "";
         const currentDeviceId = getDeviceId();
 
         const overlay = document.createElement("div");
@@ -1261,29 +1260,29 @@
         const isPassUnlocked = sessionStorage.getItem("kd_auth_pass") === "1";
         document.documentElement.appendChild(overlay);
 
-        if (guestKey) {
+        if (guestName) {
           overlay.innerHTML = `
             <div class="kd-gate-card">
               <div style="font-size: 15px; color: #8c6239; font-weight: 600;">Memverifikasi undangan...</div>
             </div>
           `;
 
-          fetch(STORAGE_BIN_URL)
+          const checkUrl =
+            GAS_URL +
+            "?action=checkDevice" +
+            "&guest=" +
+            encodeURIComponent(guestName) +
+            "&deviceId=" +
+            encodeURIComponent(currentDeviceId) +
+            "&userAgent=" +
+            encodeURIComponent(navigator.userAgent || "");
+
+          fetch(checkUrl)
             .then((r) => r.json())
             .then((data) => {
-              let registry = typeof data === "object" && data !== null ? data : {};
-              if (registry[guestKey]) {
-                if (registry[guestKey] !== currentDeviceId) {
-                  renderLockScreen(guestName);
-                  return;
-                }
-              } else {
-                registry[guestKey] = currentDeviceId;
-                fetch(STORAGE_BIN_URL, {
-                  method: "PUT",
-                  headers: { "Content-Type": "text/plain" },
-                  body: JSON.stringify(registry),
-                }).catch((err) => console.warn(err));
+              if (data && data.locked) {
+                renderLockScreen(guestName);
+                return;
               }
 
               if (isPassUnlocked) {
@@ -1293,7 +1292,7 @@
               }
             })
             .catch((err) => {
-              console.warn("Storage check offline fallback:", err);
+              console.warn("Device check offline fallback:", err);
               if (isPassUnlocked) {
                 overlay.remove();
               } else {
