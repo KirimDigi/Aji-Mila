@@ -1369,6 +1369,15 @@
                         };
                       });
 
+                      const audioSongEl = document.getElementById("song");
+                      if (audioSongEl) {
+                        audioSongEl.loop = true;
+                        audioSongEl.addEventListener("ended", function () {
+                          this.currentTime = 0;
+                          this.play();
+                        });
+                      }
+
                       addEventListener("beforeunload", () => {
                         window.scrollTo(0, 0);
                       });
@@ -4485,7 +4494,7 @@
                 </div>
 
                 <div id="wds-audio-box" style="display: none !important">
-                  <audio id="song" loop="">
+                  <audio id="song" loop="loop" loop>
                     <source src="ssstik.io_1793274721429.mp3" type="audio/mp3" />
                   </audio>
                 </div>
